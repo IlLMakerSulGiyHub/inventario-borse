@@ -231,7 +231,7 @@ body.pixel .foot{font-size:18px}
     <div class="grid" id="grid"></div>
     <div class="detail" id="detail"></div>
     <div id="outList"></div>
-    <div class="foot"><span id="count"></span><span><button id="btnLabels" class="ghost">Etichette QR</button><button id="reset" class="ghost">Ripristina esempio</button></span></div>
+    <div class="foot"><span id="count"></span><span><button id="btnLabels" class="ghost">Etichette QR</button><button id="reset" class="ghost">Svuota inventario</button></span></div>
   </aside>
 </main>
 <div id="toast" class="toast" role="status"></div>
@@ -266,18 +266,9 @@ const BAGS = {
 const uid=()=>Math.random().toString(36).slice(2,7)+Date.now().toString(36).slice(-3);
 const it=(e,n,note='',q=1)=>({id:uid(),e,n,note,q,out:null});
 function defaults(){
-  const fill=a=>{const r=a.slice();while(r.length<SLOTS)r.push(null);return r};
-  return {
-    pc:{front:fill([it('🔋','Batterie AA','Pacco ricaricabili',4),it('🖊️','Penne','Blu e nera',2),it('💾','Chiavetta USB','64 GB'),it('🪪','Biglietti da visita','',20)]),
-        left:fill([it('📱','Tablet','10 pollici, in custodia'),it('📄','Documenti','Cartellina A4'),it('🔌','Caricatore tablet','USB-C 20 W')]),
-        right:fill([it('💻','Laptop','15,6 pollici'),it('🔌','Alimentatore PC','65 W'),it('🖱️','Mouse','Wireless')])},
-    bo:{front:fill([it('🔑','Chiavi','Casa e auto'),it('👛','Portafoglio')]),
-        left:fill([it('📱','Telefono'),it('🎧','Auricolari','Con custodia')]),
-        right:fill([it('🔋','Powerbank','10.000 mAh'),it('🕶️','Occhiali da sole')])},
-    za:{front:fill([it('🍶','Borraccia','750 ml'),it('🩹','Kit pronto soccorso')]),
-        left:fill([it('🧥','Felpa'),it('📒','Quaderni','',2)]),
-        right:fill([it('💻','Laptop','14 pollici')])}
-  };
+  const empty=()=>Array(SLOTS).fill(null);
+  const d={};for(const[bk,b]of Object.entries(BAGS)){d[bk]={};for(const pk of Object.keys(b.pockets))d[bk][pk]=empty()}
+  return d;
 }
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){if(!storeOk)return true;try{localStorage.setItem(k,v);return true}catch(e){return false}}};
 const storeOk=(()=>{try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return true}catch(e){return false}})();
@@ -434,7 +425,7 @@ $('pockets').onclick=e=>{const b=e.target.closest('[data-pocket]');if(b)selectPo
 $('grid').onclick=e=>{const s=e.target.closest('.slot');if(!s)return;state.sel=+s.dataset.i;state.editing=false;sfx.pick();updateUI()};
 $('btnZip').onclick=()=>act('zip');
 $('btnFlap').onclick=()=>act('flap');
-$('reset').onclick=()=>{if(confirm('Ripristinare il contenuto di esempio? Le modifiche andranno perse.')){data=defaults();save();state.sel=null;updateUI()}};
+$('reset').onclick=()=>{if(confirm('Svuotare tutte le borse? Oggetti, foto e stati verranno eliminati da questo telefono e non si possono recuperare. I tag già scritti diventeranno "non riconosciuti".')){data=defaults();log=[];save();saveLog();state.sel=null;updateUI()}};
 $('styleSeg').onclick=e=>{const b=e.target.closest('[data-s]');if(b)setStyle(b.dataset.s)};
 let drag=null;
 $('grid').addEventListener('dragstart',e=>{const s=e.target.closest('.slot');if(!s)return;drag={pocket:state.pocket,i:+s.dataset.i};e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','x')});
