@@ -187,6 +187,22 @@ body.showlabels .labels{display:block}
   nav button{padding:6px 10px;font-size:14px}
   .scanbar button.scan{padding:12px;font-size:16px}
 }
+.bf{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;z-index:60;overflow-y:auto;padding:24px 16px}
+.bf.show{display:flex}
+body.modal{overflow:hidden}
+.bf-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;width:min(480px,100%);display:grid;gap:12px}
+body.pixel .bf-card{border-radius:0;border:4px solid var(--line);box-shadow:6px 6px 0 #0b0b12}
+.bf-l{display:grid;gap:6px;font-size:13px;color:var(--muted)}
+body.pixel .bf-l{font-size:18px}
+.bf-types{display:flex;gap:6px;flex-wrap:wrap}
+.bf-types button.on{background:var(--accentBg);border-color:var(--accent);color:var(--accent)}
+.bf-colors{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bf-colors button{width:32px;height:32px;padding:0;border-radius:50%;border:2px solid var(--line)}
+.bf-colors button.on{box-shadow:0 0 0 3px var(--accent)}
+body.pixel .bf-colors button{border-radius:0}
+.bf-colors input[type=color]{width:40px;height:34px;padding:2px}
+.bf-pockets{display:grid;gap:8px}
+nav .newbag{border-style:dashed}
 .row2{display:grid;grid-template-columns:1fr 80px;gap:8px}
 .err{color:var(--danger);font-size:13px;min-height:16px}
 .foot{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px;margin-top:auto}
@@ -235,6 +251,7 @@ body.pixel .foot{font-size:18px}
   </aside>
 </main>
 <div id="toast" class="toast" role="status"></div>
+<div id="bagForm" class="bf"></div>
 <section id="labels" class="labels">
   <div class="lhead"><h2>Etichette QR</h2><span><button id="lprint">Stampa</button><button id="lclose" class="ghost">Chiudi</button></span></div>
   <p class="muted" id="lnote"></p>
@@ -246,23 +263,36 @@ body.pixel .foot{font-size:18px}
 <script>
 const SLOTS = 12;
 const EMOJIS = ['💻','📱','🔌','🔋','🖊️','✏️','🖱️','🎧','🔑','👛','📄','📒','📚','💾','🪪','🕶️','☂️','🧥','🍶','🩹','💊','📷','⌚','🔦','🧰','🍫','🎮','📦'];
-const BAGS = {
-  pc:{name:'Borsa PC',icon:'💼',dims:[4,3,1],flap:[.72,.5],color:0x26272b,flapColor:0x232327,
-      pix:{b:'#2e2e36',hi:'#4a4a55',sh:'#1d1d23',flap:'#27272e'},pl:{x:18,y:16,w:60,h:40},
-      pockets:{front:{name:'Tasca frontale',sub:'Patta a strappo · organizer',via:'flap'},
-               left:{name:'Tasche documenti',sub:'Pannello sinistro · 2 tasche',via:'main'},
-               right:{name:'Vano laptop',sub:'Pannello destro · cinghia velcro',via:'main'}}},
-  bo:{name:'Borsello',icon:'👝',dims:[2.2,2.7,.8],flap:[.86,.55],color:0x4a3426,flapColor:0x3f2c20,
-      pix:{b:'#5a3d2b',hi:'#7a5641',sh:'#3e2a1d',flap:'#4c3324'},pl:{x:33,y:12,w:30,h:44},
+/* Modelli di borsa: forma 3D e pixel. Le borse dell'utente scelgono uno di questi. */
+const TEMPLATES = {
+  pc:{label:'Borsa a tracolla',dims:[4,3,1],flap:[.72,.5],pl:{x:18,y:16,w:60,h:40},
+      pockets:{front:{name:'Tasca frontale',sub:'Sotto la patta',via:'flap'},
+               left:{name:'Tasche documenti',sub:'Interno, lato anteriore',via:'main'},
+               right:{name:'Vano laptop',sub:'Interno, lato posteriore',via:'main'}}},
+  bo:{label:'Borsello',dims:[2.2,2.7,.8],flap:[.86,.55],pl:{x:33,y:12,w:30,h:44},
       pockets:{front:{name:'Tasca esterna',sub:'Sotto la patta',via:'flap'},
-               left:{name:'Scomparto interno',sub:'Lato anteriore',via:'main'},
-               right:{name:'Tasca con zip',sub:'Lato posteriore',via:'main'}}},
-  za:{name:'Zaino',icon:'🎒',dims:[2.8,3.8,1.3],flap:[.76,.42],color:0x2e3d4f,flapColor:0x283545,straps:true,
-      pix:{b:'#2f4a63',hi:'#476a8a',sh:'#203447',flap:'#29405a'},pl:{x:29,y:8,w:38,h:50},
-      pockets:{front:{name:'Tasca frontale',sub:'Accesso rapido',via:'flap'},
-               left:{name:'Scomparto principale',sub:'Vestiti e libri',via:'main'},
-               right:{name:'Tasca imbottita PC',sub:'Lato schiena',via:'main'}}}
+               left:{name:'Scomparto interno',sub:'Interno, lato anteriore',via:'main'},
+               right:{name:'Tasca con zip',sub:'Interno, lato posteriore',via:'main'}}},
+  za:{label:'Zaino',dims:[2.8,3.8,1.3],flap:[.76,.42],pl:{x:29,y:8,w:38,h:50},straps:true,
+      pockets:{front:{name:'Tasca frontale',sub:'Sotto la patta',via:'flap'},
+               left:{name:'Scomparto principale',sub:'Interno, lato anteriore',via:'main'},
+               right:{name:'Tasca imbottita PC',sub:'Interno, lato posteriore',via:'main'}}}
 };
+const BAG_ICONS=['💼','👝','🎒','👜','🧳','🛍️','👛','💻','📷','🧰','🎽','⚽'];
+const BAG_COLORS=['#26272b','#4a3426','#2e3d4f','#3d4a2c','#5a2430','#6b5a3a','#4a3a5c','#7a7a80'];
+const DEFAULT_META={
+  pc:{name:'Borsa PC',icon:'💼',type:'pc',color:'#26272b',pockets:{front:{name:'Tasca frontale',sub:'Patta a strappo · organizer'},left:{name:'Tasche documenti',sub:'Pannello sinistro · 2 tasche'},right:{name:'Vano laptop',sub:'Pannello destro · cinghia velcro'}}},
+  bo:{name:'Borsello',icon:'👝',type:'bo',color:'#4a3426'},
+  za:{name:'Zaino',icon:'🎒',type:'za',color:'#2e3d4f'}
+};
+function shade(hex,f){const n=parseInt(hex.slice(1),16);let r=n>>16,g=(n>>8)&255,b=n&255;
+  const m=c=>Math.max(0,Math.min(255,Math.round(f<0?c*(1+f):c+(255-c)*f)));return '#'+[m(r),m(g),m(b)].map(v=>v.toString(16).padStart(2,'0')).join('')}
+function makeBag(m){const t=TEMPLATES[m.type]||TEMPLATES.pc,pockets={};
+  for(const[k,p]of Object.entries(t.pockets)){const c=(m.pockets||{})[k]||{};pockets[k]={name:c.name||p.name,sub:c.sub!=null?c.sub:p.sub,via:p.via}}
+  return {...t,name:m.name,icon:m.icon,type:m.type,hex:m.color,color:parseInt(m.color.slice(1),16),flapColor:parseInt(shade(m.color,-.12).slice(1),16),
+    pix:{b:shade(m.color,.08),hi:shade(m.color,.3),sh:shade(m.color,-.3),flap:shade(m.color,-.05)},pockets}}
+let bagMeta,BAGS={};
+function rebuildBags(){BAGS={};for(const[k,m]of Object.entries(bagMeta))BAGS[k]=makeBag(m)}
 const uid=()=>Math.random().toString(36).slice(2,7)+Date.now().toString(36).slice(-3);
 const it=(e,n,note='',q=1)=>({id:uid(),e,n,note,q,out:null});
 function defaults(){
@@ -278,15 +308,22 @@ function loadPhoto(file){return new Promise((res,rej)=>{const r=new FileReader()
     res(c.toDataURL('image/jpeg',.8))};im.onerror=rej;im.src=r.result};
   r.onerror=rej;r.readAsDataURL(file)})}
 const icon=(x,cls='')=>x.img?`<img class="ph ${cls}" src="${x.img}" alt="" draggable="false">`:`<span class="e">${x.e}</span>`;
+try{bagMeta=JSON.parse(store.get('inv-bags-v1'))}catch(e){}
+if(!bagMeta||!Object.keys(bagMeta).length)bagMeta=JSON.parse(JSON.stringify(DEFAULT_META));
+rebuildBags();
+const saveBags=()=>store.set('inv-bags-v1',JSON.stringify(bagMeta));
 let data; try{data=JSON.parse(store.get('inv-borse-v1'))}catch(e){}
-if(!data||!data.pc)data=defaults();
+if(!data||typeof data!=='object')data=defaults();
+function ensureData(){for(const[bk,b]of Object.entries(BAGS)){data[bk]=data[bk]||{};for(const pk of Object.keys(b.pockets))if(!Array.isArray(data[bk][pk]))data[bk][pk]=Array(SLOTS).fill(null)}
+  for(const bk of Object.keys(data))if(!BAGS[bk])delete data[bk]}
+ensureData();saveBags();
 const save=()=>store.set('inv-borse-v1',JSON.stringify(data));
 let log=[];try{log=JSON.parse(store.get('inv-log-v1'))||[]}catch(e){}
 const saveLog=()=>store.set('inv-log-v1',JSON.stringify(log.slice(-200)));
 for(const bag of Object.values(data))for(const arr of Object.values(bag))arr.forEach(x=>{if(x&&!x.id)x.id=uid()});
 save();
 
-const state={bag:'pc',main:false,flap:false,pocket:null,sel:null,editing:false,style:store.get('inv-style')||'pro'};
+const state={bag:BAGS[store.get('inv-lastbag')]?store.get('inv-lastbag'):Object.keys(BAGS)[0],main:false,flap:false,pocket:null,sel:null,editing:false,style:store.get('inv-style')||'pro'};
 const $=id=>document.getElementById(id);
 
 /* ---------- sound (pixel) ---------- */
@@ -328,7 +365,7 @@ function selectPocket(p){
   state.pocket=p;state.sel=null;state.editing=false;updateUI();renderPixel();
 }
 function switchBag(id){
-  Object.assign(state,{bag:id,main:false,flap:false,pocket:null,sel:null,editing:false});
+  Object.assign(state,{bag:id,main:false,flap:false,pocket:null,sel:null,editing:false});store.set('inv-lastbag',id);
   if(window.THREE&&three.ok)buildBag(id);
   renderPixel();updateUI();
 }
@@ -337,7 +374,8 @@ function switchBag(id){
 function updateUI(){
   const b=BAGS[state.bag];
   $('bagTabs').innerHTML=Object.entries(BAGS).map(([k,v])=>{const o=outItems(k).length;
-    return `<button data-bag="${k}" class="${k===state.bag?'on':''}"><span>${v.icon}</span>${v.name}${o?`<span class="badge">${o} fuori</span>`:''}</button>`}).join('');
+    return `<button data-bag="${k}" class="${k===state.bag?'on':''}"><span>${v.icon}</span>${esc(v.name)}${o?`<span class="badge">${o} fuori</span>`:''}</button>`}).join('')
+    +`<button data-editbag class="ghost" title="Modifica questa borsa">✏️ Modifica</button><button data-newbag class="newbag">＋ Nuova borsa</button>`;
   renderOut();
   $('btnZip').textContent=state.main?'Chiudi cerniera':'Apri cerniera';
   $('btnFlap').textContent=state.flap?'Chiudi patta':'Apri patta';
@@ -422,7 +460,54 @@ function renderForm(x){
 }
 
 /* events */
-$('bagTabs').onclick=e=>{const b=e.target.closest('[data-bag]');if(b&&b.dataset.bag!==state.bag){sfx.pick();switchBag(b.dataset.bag)}};
+$('bagTabs').onclick=e=>{
+  if(e.target.closest('[data-newbag]')){openBagForm(null);return}
+  if(e.target.closest('[data-editbag]')){openBagForm(state.bag);return}
+  const b=e.target.closest('[data-bag]');if(b&&b.dataset.bag!==state.bag){sfx.pick();switchBag(b.dataset.bag)}};
+
+/* ---------- crea / modifica borsa ---------- */
+function openBagForm(id){
+  const m=id?JSON.parse(JSON.stringify(bagMeta[id])):{name:'',icon:'👜',type:'pc',color:BAG_COLORS[3],pockets:{}};
+  const f=$('bagForm');
+  const pocketInputs=()=>{const t=TEMPLATES[m.type];return Object.entries(t.pockets).map(([k,p])=>{const c=(m.pockets||{})[k]||{};
+    return `<label class="bf-l">${k==='front'?'Tasca esterna (patta)':k==='left'?'Interno, lato anteriore':'Interno, lato posteriore'}<input data-pk="${k}" value="${esc(c.name||'')}" placeholder="${esc(p.name)}"></label>`}).join('')};
+  f.innerHTML=`<div class="bf-card" role="dialog" aria-label="${id?'Modifica borsa':'Nuova borsa'}">
+    <h2>${id?'Modifica borsa':'Nuova borsa'}</h2>
+    <label class="bf-l">Nome<input id="bfName" value="${esc(m.name)}" placeholder="Borsa palestra"></label>
+    <div class="bf-l">Icona<div class="emojis" id="bfIcon">${BAG_ICONS.map(i=>`<button type="button" data-i="${i}" class="${i===m.icon?'on':''}">${i}</button>`).join('')}</div></div>
+    <div class="bf-l">Forma<div class="bf-types" id="bfType">${Object.entries(TEMPLATES).map(([k,t])=>`<button type="button" data-t="${k}" class="${k===m.type?'on':''}">${t.label}</button>`).join('')}</div></div>
+    <div class="bf-l">Colore<div class="bf-colors" id="bfColor">${BAG_COLORS.map(c=>`<button type="button" data-c="${c}" class="${c===m.color?'on':''}" style="background:${c}" aria-label="Colore ${c}"></button>`).join('')}<input type="color" id="bfCustom" value="${m.color}" aria-label="Altro colore"></div></div>
+    <div class="bf-l">Nomi degli scomparti <span class="muted">(vuoto = nome suggerito)</span></div>
+    <div id="bfPockets" class="bf-pockets">${pocketInputs()}</div>
+    <div class="err" id="bfErr"></div>
+    <div class="actions wrap"><button id="bfSave" class="primary">${id?'Salva':'Crea borsa'}</button><button id="bfCancel" class="ghost">Annulla</button>
+      ${id?'<button id="bfDel" class="danger" style="margin-left:auto">Elimina borsa</button>':''}</div></div>`;
+  f.classList.add('show');document.body.classList.add('modal');
+  const readPockets=()=>{m.pockets={};f.querySelectorAll('[data-pk]').forEach(i=>{if(i.value.trim())m.pockets[i.dataset.pk]={name:i.value.trim()}})};
+  const pick=(box,attr,fn)=>$(box).onclick=e=>{const b=e.target.closest(`[data-${attr}]`);if(!b)return;fn(b.dataset[attr]);[...$(box).children].forEach(c=>c.classList&&c.classList.toggle('on',c===b));sfx.pick()};
+  pick('bfIcon','i',v=>m.icon=v);
+  pick('bfColor','c',v=>{m.color=v;$('bfCustom').value=v});
+  pick('bfType','t',v=>{readPockets();m.type=v;$('bfPockets').innerHTML=pocketInputs()});
+  $('bfCustom').oninput=e=>{m.color=e.target.value;$('bfColor').querySelectorAll('[data-c]').forEach(c=>c.classList.remove('on'))};
+  $('bfName').oninput=()=>$('bfErr').textContent='';
+  $('bfName').focus();
+  const close=()=>{f.classList.remove('show');document.body.classList.remove('modal')};
+  $('bfCancel').onclick=close;
+  f.onclick=e=>{if(e.target===f)close()};
+  $('bfSave').onclick=()=>{
+    m.name=$('bfName').value.trim();if(!m.name){$('bfErr').textContent='Inserisci un nome per la borsa';sfx.bad();return}
+    readPockets();const key=id||'b'+uid();
+    bagMeta[key]={name:m.name,icon:m.icon,type:m.type,color:m.color,pockets:m.pockets};
+    rebuildBags();ensureData();saveBags();save();close();sfx.open();
+    switchBag(key);toast({title:id?'Borsa aggiornata':'Borsa creata',sub:m.icon+' '+m.name})};
+  if(id)$('bfDel').onclick=()=>{
+    if(Object.keys(bagMeta).length<2){$('bfErr').textContent='Deve rimanere almeno una borsa';sfx.bad();return}
+    const n=Object.values(data[id]).flat().filter(Boolean).length;
+    if(!confirm(`Eliminare "${bagMeta[id].name}"${n?` e i ${n} oggetti che contiene`:''}? Non si può annullare e i loro tag diventeranno "non riconosciuti".`))return;
+    delete bagMeta[id];rebuildBags();ensureData();saveBags();save();close();sfx.close();
+    switchBag(Object.keys(BAGS)[0]);toast({ok:false,title:'Borsa eliminata',sub:m.name})};
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('bagForm').classList.contains('show')){$('bagForm').classList.remove('show');document.body.classList.remove('modal')}});
 $('pockets').onclick=e=>{const b=e.target.closest('[data-pocket]');if(b)selectPocket(b.dataset.pocket)};
 $('grid').onclick=e=>{const s=e.target.closest('.slot');if(!s)return;state.sel=+s.dataset.i;state.editing=false;sfx.pick();updateUI()};
 $('btnZip').onclick=()=>act('zip');
