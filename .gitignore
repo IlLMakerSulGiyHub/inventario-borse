@@ -1,0 +1,4 @@
+# Foto personali della borsa: non pubblicarle
+*.jpg
+*.jpeg
+.claude/
