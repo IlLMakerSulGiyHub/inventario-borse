@@ -391,8 +391,8 @@ function renderForm(x){
   const d=$('detail');
   d.innerHTML=`<div class="form">
     <div class="photo"><div class="pprev" id="pprev"></div>
-      <div class="pbtns"><button type="button" id="fimgbtn">Scegli foto</button><button type="button" id="fimgdel" class="ghost">Rimuovi foto</button>
-      <input type="file" id="fimg" accept="image/*" hidden></div></div>
+      <div class="pbtns"><button type="button" id="fcambtn" class="primary">📷 Scatta foto</button><button type="button" id="fimgbtn">🖼️ Dalla galleria</button><button type="button" id="fimgdel" class="ghost">Rimuovi foto</button>
+      <input type="file" id="fcam" accept="image/*" capture="environment" hidden><input type="file" id="fimg" accept="image/*" hidden></div></div>
     <p class="muted" style="margin:0">Oppure scegli un'icona:</p>
     <div class="emojis" id="emo">${EMOJIS.map(e=>`<button type="button" class="${e===emo?'on':''}" data-e="${e}">${e}</button>`).join('')}</div>
     <div class="row2"><input id="fn" placeholder="Nome (es. Caricatore)" value="${x?esc(x.n):''}"><input id="fq" type="number" min="1" step="1" value="${x?x.q:1}" aria-label="Quantità"></div>
@@ -401,9 +401,11 @@ function renderForm(x){
     <div class="actions"><button id="fsave">${x?'Salva':'Aggiungi'}</button><button id="fcancel" class="ghost">Annulla</button></div></div>`;
   const showPrev=()=>{$('pprev').innerHTML=img?`<img src="${img}" alt="">`:`<span>${emo}</span>`;$('fimgdel').style.display=img?'':'none'};showPrev();
   $('fimgbtn').onclick=()=>$('fimg').click();
+  $('fcambtn').onclick=()=>$('fcam').click();
   let pending=null;
-  $('fimg').onchange=()=>{const f=$('fimg').files[0];if(!f)return;$('pprev').innerHTML='<span style="font-size:13px">…</span>';
-    pending=loadPhoto(f).then(u=>{img=u;showPrev();$('ferr').textContent='';sfx.pick()},()=>{showPrev();$('ferr').textContent='Immagine non valida. Prova con un JPG o PNG.';sfx.bad()}).finally(()=>pending=null)};
+  const onPick=inp=>()=>{const f=inp.files[0];if(!f)return;$('pprev').innerHTML='<span style="font-size:13px">…</span>';
+    pending=loadPhoto(f).then(u=>{img=u;showPrev();$('ferr').textContent='';sfx.pick()},()=>{showPrev();$('ferr').textContent='Immagine non valida. Prova con un JPG o PNG.';sfx.bad()}).finally(()=>{pending=null;inp.value=''})};
+  $('fimg').onchange=onPick($('fimg'));$('fcam').onchange=onPick($('fcam'));
   $('fimgdel').onclick=()=>{img=null;showPrev()};
   $('emo').onclick=e=>{const b=e.target.closest('[data-e]');if(!b)return;emo=b.dataset.e;[...$('emo').children].forEach(c=>c.classList.toggle('on',c===b));showPrev()};
   $('fn').oninput=()=>$('ferr').textContent='';
